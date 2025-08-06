@@ -30,7 +30,7 @@ func run() error {
 	cmd.Stderr = os.Stderr
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
+		Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWUTS | syscall.CLONE_NEWNS | syscall.CLONE_NEWPID,
 
 		UidMappings: []syscall.SysProcIDMap{
 			{ContainerID: 0, HostID: os.Getuid(), Size: 1},
@@ -62,16 +62,26 @@ func sub() error {
 	if err := syscall.Sethostname([]byte("container")); err != nil {
 		return err
 	}
+
 	if err := syscall.Chroot("/home/jdubs/alpine-fs"); err != nil {
 		return err
 	}
+
 	if err := syscall.Chdir("/"); err != nil {
+		return err
+	}
+
+	if err := syscall.Mount("proc", "/proc", "proc", 0, ""); err != nil {
 		return err
 	}
 
 	log.Printf("running container as proc %d", os.Getpid())
 
 	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	if err := syscall.Unmount("/proc", 0); err != nil {
 		return err
 	}
 
