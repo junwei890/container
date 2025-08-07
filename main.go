@@ -100,6 +100,10 @@ func cGroups() error {
 	mem := "/sys/fs/cgroup/memory/container"
 	cpu := "/sys/fs/cgroup/cpu/container"
 
+	pidsTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/pids"
+	memTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/memory"
+	cpuTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/cpu"
+
 	if err := os.WriteFile(path.Join(pids, "pids.max"), []byte("30"), 0777); err != nil {
 		return err
 	}
@@ -119,6 +123,13 @@ func cGroups() error {
 			return err
 		}
 
+	}
+
+	targets := []string{pidsTarget, memTarget, cpuTarget}
+	for i := range targets {
+		if err := syscall.Mount(cGroups[i], targets[i], "", syscall.MS_BIND, ""); err != nil {
+			return err
+		}
 	}
 
 	return nil
