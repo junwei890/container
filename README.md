@@ -27,9 +27,9 @@ cmd.SysProcAttr := &syscall.SysProcAttr{
 }
 ```
 
-After setting clone flags, the uid and gid mappings here map the namespace ID, which is root in the container, to the current user and group IDs on host, which are non-root. The credential just tells the container to run as root (in the namespace).
+After setting clone flags, the uid and gid mappings here map the container ID, which is root in the namespace, to the current user and group IDs on host, which are non-root on host. The credential just tells the container to run as root (in the namespace).
 
-So why a rootless container? A rootless container would prevent the processes in the container from affecting files on host. It would also allow us to chroot since we are now a root user inside our new namespace.
+So why a rootless container? A rootless container would prevent the processes within from affecting files on host. It would also allow us to chroot since we are now a root user inside our container.
 
 ### chroot
 Change root, or chroot, allows us to limit the scope of the filesystem that our container has access to. In Go, this is done by:
@@ -56,23 +56,23 @@ if err := syscall.Mount("proc", "/proc", "proc", 0, ""); err != nil {
 }
 ```
 
-This code snippet allows me to view only process IDs within the container when I run `ps` within the container. However, there is a problem with this, while running the container, when I run `ps` outside of the container, it still shows me processes happening within the container together with all other processes running on host. I don't want that, so this is where unshare flags come into play.
+This code snippet allows me to view only process IDs within the container when I run `ps` within the container. However, there is a problem with this, while running the container, when I run `ps` on host, it still shows me processes happening within the container together with all other processes running on host. I don't want that, so this is where unshare flags come into play.
 
-Unshare flags basically prevent changes in the container's namespace from propagating into the host's filesystem.
+Unshare flags basically prevent changes in the container from propagating into the host's filesystem.
 ```
 Unshareflags: syscall_CLONE_NEWNS,
 ```
 
-By adding this line to `&syscall.SysProcAttr{}`, process IDs within the container's namespace don't show when I run `ps` on host:
+By adding this line to `&syscall.SysProcAttr{}`, process IDs within the container don't show when I run `ps` on host:
 
 ![](/images/{4B04F37F-C543-4878-B690-2D00CB6C6271}.png)
 
-Unshare flags and mounts are particularly useful as not only does it isolate what's happening within the namespace, it also allows me to see the parameters I set for cgroups within the namespace.
+Unshare flags and mounts are particularly useful as not only does it isolate what's happening within the container, it also allows me to see the parameters I set for cgroups from within the container.
 
 ### cgroups
-If chroot changes what the namespace can see, then cgroups control how much a namespace can use. Control groups or cgroups allow us to limit how much resources, like memory and cpu a namespace can use. They also allow us to limit the number of processes a namespace can have running.
+If chroot changes what the container can see, then cgroups control how much a container can use. Control groups or cgroups allow us to limit how much resources, like memory and cpu a container can use. They also allow us to limit the number of processes a container can have running.
 
-Setting up cgroups for my container was a major hurdle. Firstly, my Linux distro was running cgroup v1, meaning I had to create a hierarchy for each resource I would like to limit. That wouldn't be a problem, I could just do it through Go code, just use `os.Mkdir()` in the `/sys/fs/cgroup/` directory for each cgroup and call it a day...But I was building a rootless container. While in the container, I wasn't able to alter anything in the `/sys/fs/cgroup/` directory, remember, I only have root privileges within my namespace, not on host.
+Setting up cgroups for my container was a major hurdle. Firstly, my Linux distro was running cgroup v1, meaning I had to create a hierarchy for each resource I would like to limit. That wouldn't be a problem, I could just do it through Go code, just use `os.Mkdir()` in the `/sys/fs/cgroup/` directory for each cgroup and call it a day...But I was building a rootless container. While in the container, I wasn't able to alter anything in the `/sys/fs/cgroup/` directory, remember, I only have root privileges within my container, not on host.
 
 Therefore, this meant that I had to delegate cgroup subtrees for each cgroup resource, this would allow me to write limits on resources from within the container.
 
@@ -95,7 +95,7 @@ cd container
 chmod a+w memory.limit_in_bytes cgroup.procs notify_on_release
 ```
 
-Done, I've delegated a cgroup subtree that my container can use. I then repeated the steps for cpu as well as pids. All that's left to do is write the limits on resources to these delegated subtrees. Here was the code I wrote for it:
+Done, I've delegated a cgroup subtree that my container now can use. I then repeated the steps for cpu as well as pids. All that's left to do is write the limits on resources to these delegated subtrees. Here is the code I wrote for it:
 ```
 pids := "/sys/fs/cgroup/pids/container"
 mem := "/sys/fs/cgroup/memory/container"
