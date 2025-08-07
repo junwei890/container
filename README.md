@@ -137,10 +137,11 @@ for i := range targets {
 	}
 }
 ```
+Here's the end result after mounting, I can now see the resource limits from within the container
 
 ![](/images/{080248C6-B0D9-454C-B1C0-2F9E85990078}.png)
 
-## Fin
-Not only did this project help me understand how containers work, it also gave me a deeper understanding of the inner workings of the Linux operating system (its filesystem, privilege and resource management). It also sparked curiosity in topics I would like to explore further, like what exactly are syscalls? This could be something I explore in a future project, maybe writing a kernel from scratch?
+And with that, I've finished building a simple rootless container. Do note that I didn't cover everything I did in this readme, check out the [source code](https://github.com/junwei890/container/blob/main/main.go) if you're interested in how I put everything together.
 
-Do note that I didn't cover everything I did in this readme, see [main.go](https://github.com/junwei890/container/blob/main/main.go) for the full source code.
+## Fin
+After completing this project, I had a better understanding of how containers work, I also had a deeper understanding of the inner workings of the Linux operating system (its filesystem, privilege and resource management). It also sparked curiosity in topics I would like to explore further, like what exactly are syscalls? This could be something I explore in a future project, maybe writing a kernel from scratch?
