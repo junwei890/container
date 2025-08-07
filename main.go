@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
+	"strconv"
 	"syscall"
 )
 
@@ -30,7 +32,7 @@ func run() error {
 	cmd.Stderr = os.Stderr
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWUTS | syscall.CLONE_NEWNS | syscall.CLONE_NEWPID,
+		Cloneflags:   syscall.CLONE_NEWUSER | syscall.CLONE_NEWUTS | syscall.CLONE_NEWNS | syscall.CLONE_NEWPID,
 		Unshareflags: syscall.CLONE_NEWNS,
 
 		UidMappings: []syscall.SysProcIDMap{
@@ -60,6 +62,10 @@ func sub() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	if err := cGroups(); err != nil {
+		return err
+	}
+
 	if err := syscall.Sethostname([]byte("container")); err != nil {
 		return err
 	}
@@ -84,6 +90,35 @@ func sub() error {
 
 	if err := syscall.Unmount("/proc", 0); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func cGroups() error {
+	pids := "/sys/fs/cgroup/pids/container"
+	mem := "/sys/fs/cgroup/memory/container"
+	cpu := "/sys/fs/cgroup/cpu/container"
+
+	if err := os.WriteFile(path.Join(pids, "pids.max"), []byte("30"), 0777); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path.Join(mem, "memory.limit_in_bytes"), []byte("31457280"), 0777); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path.Join(cpu, "cpu.cfs_quota_us"), []byte("50000"), 0777); err != nil {
+		return err
+	}
+
+	cGroups := []string{pids, mem, cpu}
+	for _, group := range cGroups {
+		if err := os.WriteFile(path.Join(group, "notify_on_release"), []byte("1"), 0777); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path.Join(group, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0777); err != nil {
+			return err
+		}
+
 	}
 
 	return nil
