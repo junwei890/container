@@ -73,7 +73,6 @@ func sub() error {
 	if err := syscall.Chroot("/home/jdubs/alpine-fs"); err != nil {
 		return err
 	}
-
 	if err := syscall.Chdir("/"); err != nil {
 		return err
 	}
@@ -91,6 +90,12 @@ func sub() error {
 	if err := syscall.Unmount("/proc", 0); err != nil {
 		return err
 	}
+	cGroups := []string{"pids", "memory", "cpu"}
+	for _, group := range cGroups {
+		if err := syscall.Unmount(path.Join("/sys/fs/cgroup", group), 0); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -99,10 +104,6 @@ func cGroups() error {
 	pids := "/sys/fs/cgroup/pids/container"
 	mem := "/sys/fs/cgroup/memory/container"
 	cpu := "/sys/fs/cgroup/cpu/container"
-
-	pidsTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/pids"
-	memTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/memory"
-	cpuTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/cpu"
 
 	if err := os.WriteFile(path.Join(pids, "pids.max"), []byte("30"), 0777); err != nil {
 		return err
@@ -122,8 +123,11 @@ func cGroups() error {
 		if err := os.WriteFile(path.Join(group, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0777); err != nil {
 			return err
 		}
-
 	}
+
+	pidsTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/pids"
+	memTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/memory"
+	cpuTarget := "/home/jdubs/alpine-fs/sys/fs/cgroup/cpu"
 
 	targets := []string{pidsTarget, memTarget, cpuTarget}
 	for i := range targets {
