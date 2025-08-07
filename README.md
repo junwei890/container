@@ -84,7 +84,7 @@ sudo mkdir container
 
 I then changed the owner of this `container` directory to me (the user):
 ```
-chown -R jdubs:jdubs container
+sudo chown -R jdubs:jdubs container
 ```
 
 This recursively changes the owner of the directory and all files in the directory to the user on host. I made sure to use the user that I mapped the container ID to.
@@ -145,5 +145,3 @@ And with that, I've finished building a simple rootless container. Do note that 
 
 ## Fin
 After completing this project, I had a better understanding of how containers work, I also had a deeper understanding of the inner workings of the Linux operating system (its filesystem, privilege and resource management).
-
-This project has sparked newfound interests that I would like to explore further, like what exactly are syscalls? This could be something I learn about in a future project, maybe writing a kernel from scratch?
