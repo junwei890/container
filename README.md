@@ -29,7 +29,7 @@ cmd.SysProcAttr := &syscall.SysProcAttr{
 
 After setting clone flags, the uid and gid mappings here map the container ID, which is root in the namespace, to the current user and group IDs on host, which are non-root on host. The credential just tells the container to run as root (in the namespace).
 
-So why a rootless container? A rootless container would prevent the processes within from affecting files on host. It would also allow us to chroot since we are now a root user inside our container.
+A rootless container would prevent the processes within from affecting files on host. It would also allow us to chroot since we are now a root user inside our container.
 
 ### chroot
 Change root, or chroot, allows us to limit the scope of the filesystem that our container has access to. In Go, this is done by:
@@ -42,9 +42,7 @@ if err := syscall.Chdir("/"); err != nil {
 }
 ```
 
-For this project, I just curled an Alpine Linux filesystem and unzipped it into an `alpine-fs` directory. When we pull down a Docker image and run it for example, conceptually, Docker is doing the same thing as what I did with `alpine-fs`. It's "curling" everything needed to run the application, unzipping it into a directory, then chrooting to that unzipped directory.
-
-That's why when we run containers, we only have access to a minimal filesystem needed to run the application, nothing more.
+For this project, I just curled an Alpine Linux filesystem and unzipped it into an `alpine-fs` directory. When we pull down a Docker image and run it for example, conceptually, Docker is doing the same thing. It's downloading everything needed to run the application, unzipping it into a directory, then chrooting to that unzipped directory.
 
 ![](/images/{267BF884-5517-4166-8BF7-83091B42F45D}.png)
 
@@ -56,9 +54,8 @@ if err := syscall.Mount("proc", "/proc", "proc", 0, ""); err != nil {
 }
 ```
 
-This code snippet allows me to view only process IDs within the container when I run `ps` within the container. However, there is a problem with this, while running the container, when I run `ps` on host, it still shows me processes happening within the container together with all other processes running on host. I don't want that, so this is where unshare flags come into play.
+This code snippet allows me to view only process IDs within the container when I run `ps` within the container. However, while running the container, when I run `ps` on host, it still shows me processes happening within the container together with all other processes running on host. So I used unshare flags prevent changes in the container from propagating into the host's filesystem.
 
-Unshare flags basically prevent changes in the container from propagating into the host's filesystem.
 ```
 Unshareflags: syscall_CLONE_NEWNS,
 ```
@@ -70,9 +67,9 @@ By adding this line to `&syscall.SysProcAttr{}`, process IDs within the containe
 Unshare flags and mounts are particularly useful as not only does it isolate what's happening within the container, it also allows me to see the parameters I set for cgroups from within the container.
 
 ### cgroups
-If chroot changes what the container can see, then cgroups control how much a container can use. Control groups or cgroups allow us to limit how much resources, like memory and cpu a container can use. They also allow us to limit the number of processes a container can have running.
+Control groups or cgroups allow us to limit how much resources, like memory and cpu a container can use. They also allow us to limit the number of processes a container can have running.
 
-Setting up cgroups for my container was a major hurdle. Firstly, my Linux distro was running cgroup v1, meaning I had to create a hierarchy for each resource I would like to limit. That wouldn't be a problem, I could just do it through Go code, just use `os.Mkdir()` in the `/sys/fs/cgroup/` directory for each cgroup and call it a day...But I was building a rootless container. While in the container, I wasn't able to alter anything in the `/sys/fs/cgroup/` directory, remember, I only have root privileges within my container, not on host.
+Setting up cgroups for my container was a major hurdle. Firstly, I was running cgroup v1, meaning I had to create a hierarchy for each resource I would like to limit. Furthermore, while in the container, I wasn't able to alter anything in the `/sys/fs/cgroup/` directory, since I only have root privileges within my container, not on host.
 
 Therefore, this meant that I had to delegate cgroup subtrees for each cgroup resource, this would allow me to write limits on resources from within the container.
 
@@ -95,7 +92,7 @@ cd container
 chmod a+w memory.limit_in_bytes cgroup.procs notify_on_release
 ```
 
-Done, I've delegated a cgroup subtree that my container now can use. I then repeated the steps for cpu as well as pids. All that's left to do is write the limits on resources to these delegated subtrees. Here is the code I wrote for it:
+I've delegated a cgroup subtree that my container now can use. I then repeated the steps for cpu as well as pids. All that's left to do is write the limits on resources to these delegated subtrees. Here is the code I wrote for it:
 ```
 pids := "/sys/fs/cgroup/pids/container"
 mem := "/sys/fs/cgroup/memory/container"
@@ -142,6 +139,3 @@ Here's the end result after mounting, I can now see the resource limits from wit
 ![](/images/{080248C6-B0D9-454C-B1C0-2F9E85990078}.png)
 
 And with that, I've finished building a simple rootless container. Do note that I didn't cover everything I did in this readme, check out the [source code](https://github.com/junwei890/container/blob/main/main.go) if you're interested in how I put everything together.
-
-## Fin
-After completing this project, I had a better understanding of how containers work, I also had a deeper understanding of the inner workings of the Linux operating system (its filesystem, privilege and resource management).
